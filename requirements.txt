@@ -3,3 +3,4 @@ openai
 tiktoken
 youtube_transcript_api
 pytube
+bs4
