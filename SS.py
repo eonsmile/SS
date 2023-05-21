@@ -17,13 +17,15 @@ STOP_WORDS=['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 
 ###########
 # Functions
 ###########
-def extractText(url):
-  response = requests.get(url)
-  response.close()
-  soup = BeautifulSoup(response.text, 'html.parser')
-  l=[]
-  for tag in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']): l.append(tag.get_text())
-  return '\n'.join(l)
+def getTextFromURL(url):
+  r = requests.get(url)
+  soup = BeautifulSoup(r.text, 'html.parser')
+  for script in soup(['script', 'style']):
+    script.extract()
+  text = soup.get_text()
+  lines = (line.strip() for line in text.splitlines())
+  chunks = (phrase.strip() for line in lines for phrase in line.split('  '))
+  return '\n'.join(chunk for chunk in chunks if chunk)
 
 def preprocess(z):
   return ' '.join([word for word in re.sub(r'[^\w\s]', '', z).split() if word.lower() not in STOP_WORDS])
@@ -87,22 +89,18 @@ if isSubmit:
   # url = 'https://www.youtube.com/watch?v=wV4NBq9wbY4&t=7s' # Chinese
   # url = 'https://thenewstack.io/with-chatgpt-honeycomb-users-simply-say-what-theyre-looking-for/' # Text
   with st.spinner():
-    id=pytube.extract.video_id(url)
-    try:
-      transcript=' '.join([z['text'] for z in YouTubeTranscriptApi.get_transcript(id,languages=['en','zh','zh-HK'])])
-      isOk=True
-    except:
-      isOk=False
-    if isOk:
+    if 'youtube' in url or 'youtu.be' in url:
+      id=pytube.extract.video_id(url)
+      z1= ' '.join([z['text'] for z in YouTubeTranscriptApi.get_transcript(id, languages=['en', 'zh', 'zh-HK'])])
       try:
         YouTubeTranscriptApi.list_transcripts(id).find_transcript(['en'])
       except:
         st.write('Chinese detected ....')
-        transcript=translateShorten(transcript)
+        z1=translateShorten(z1)
     else:
-      transcript=extractText(url)
+      z1=getTextFromURL(url)
     ####################################################################################################
-    text=preprocess(transcript)
-    text = refine(llm,text)
-    summary=summarize(text)
+    z2=preprocess(z1)
+    z3=refine(llm,z2)
+    summary=summarize(z3)
   st.write(summary)
